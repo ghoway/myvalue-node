@@ -1,0 +1,211 @@
+const axios = require('axios');
+const readline = require('readline');
+const fs = require('fs');
+const colors = require('colors');
+
+async function Fake() {
+  try {
+    const response = await axios.get('http://wahidayatullah.my.id/fake');
+    return response.data;
+  } catch (error) {
+    console.error('Error in Fake:', error.message);
+    throw error;
+  }
+}
+
+async function Registrasi(email, firstname, lastname, phone) {
+  const requestBody = {
+    email: email,
+    password: "asujancok32",
+    mobilePhoneNumber: phone,
+    mobilePhonePrefix: "+62",
+    firstName: firstname,
+    lastName: lastname,
+    clientID: "ValueID",
+    outletID: "10428",
+    redirect_uri: "https://auth.myvalue.id/authorize/account",
+    additional: {
+      email_only: "true"
+    }
+  };
+
+  const headers = {
+    "Host": "auth.myvalue.id",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "id-ID",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Content-Type": "application/json",
+    "Content-Length": String(JSON.stringify(requestBody).length),
+    "Origin": "https://auth.myvalue.id",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Referer": "https://auth.myvalue.id/authorize/register?client_id=ValueID&redirect_uri=https%3A%2F%2Fauth.myvalue.id%2Fauthorize%2Faccount&back=&state=",
+    "Cookie": "client=%7B%22client_id%22%3A%22ValueID%22%2C%22redirect_uri%22%3A%22https%3A%2F%2Fauth.myvalue.id%2Fauthorize%2Faccount%22%2C%22back%22%3A%22%22%2C%22state%22%3A%22%22%2C%22isThirdParty%22%3Afalse%7D",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin"
+  };
+
+  try {
+    const response = await axios.post('https://auth.myvalue.id/v1/user/', requestBody, { headers });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.status === 409 && error.response.data && error.response.data.detail === "Nomor sudah terdaftar. Silahkan gunakan nomor yang lain") {
+      return null; // Mengembalikan null jika user sudah ada
+    } else {
+      console.error('Error in Registrasi:', error.message);
+      throw error;
+    }
+  }
+}
+
+async function RegistrasiLoop(email, firstname, lastname) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  rl.question("Masukkan nomor hp: ", async function (phone) {
+    rl.close();
+
+    const registrationResult = await Registrasi(email, firstname, lastname, phone);
+    if (registrationResult) {
+      // console.log(registrationResult);
+      console.log(colors.yellow(`[${new Date().toLocaleDateString()}]`) + " => " + colors.green("SUCCESS") + " " +
+        colors.yellow(`${registrationResult.kgValueID} | ${registrationResult.firstName} | ${registrationResult.lastName} | ${registrationResult.email}`));
+
+      sendVerification(phone)
+        .then((verificationResult) => {
+          // console.log('Verification Sent:', verificationResult);
+          submitOtp(phone);
+        })
+        .catch((error) => {
+          console.error('Error in sendVerification:', error.message);
+        });
+    } else {
+      console.log(colors.red("User already exists. Please try again."));
+      RegistrasiLoop(email, firstname, lastname);
+    }
+  });
+}
+
+async function sendVerification(phone) {
+  const requestBody2 = {
+    username: phone,
+    template: ""
+  };
+
+  const headers = {
+    // Definisi headers untuk request ke-2
+    "Host": "auth.myvalue.id",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "id-ID",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Content-Type": "application/json",
+    "Content-Length": String(JSON.stringify(requestBody2).length),
+    "Origin": "https://auth.myvalue.id",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Referer": "https://auth.myvalue.id/authorize/register?client_id=ValueID&redirect_uri=https%3A%2F%2Fauth.myvalue.id%2Fauthorize%2Faccount&back=&state=",
+    "Cookie": "client=%7B%22client_id%22%3A%22ValueID%22%2C%22redirect_uri%22%3A%22https%3A%2F%2Fauth.myvalue.id%2Fauthorize%2Faccount%22%2C%22back%22%3A%22%22%2C%22state%22%3A%22%22%2C%22isThirdParty%22%3Afalse%7D",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin"
+  };
+
+  try {
+    const response = await axios.post('https://auth.myvalue.id/v1/verification/send/', requestBody2, { headers });
+    // console.log('Verifikasi Response:', response.data);
+    console.log(`[${getCurrentDateTime()}] ${colors.green('SUCCESS')} => OTP Berhasil di kirim`);
+
+  } catch (error) {
+    console.error('Error in Verifikasi:', error);
+    throw error;
+  }
+}
+
+async function submitOtp(phone) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  function verifyOTP() {
+    rl.question("Masukkan kode OTP: ", async function (otp) {
+      const requestBody3 = {
+        username: phone,
+        token: otp
+      };
+
+      const headers = {
+        // Definisi headers untuk request ke-3
+        "Host": "auth.myvalue.id",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/118.0",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "id-ID",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Content-Type": "application/json",
+        "Content-Length": String(JSON.stringify(requestBody3).length),
+        "Origin": "https://auth.myvalue.id",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Referer": "https://auth.myvalue.id/authorize/verify?client_id=MyValueWeb&redirect_uri=https%3A%2F%2Fwww.myvalue.id%2Fredirect&state=eNjUv67yihvE0",
+        "Cookie": "client=%7B%22client_id%22%3A%22MyValueWeb%22%2C%22redirect_uri%22%3A%22https%3A%2F%2Fwww.myvalue.id%2Fredirect%22%2C%22state%22%3A%22eNjUv67yihvE0%22%2C%22isThirdParty%22%3Afalse%7D",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin"
+      };
+
+      try {
+        const response = await axios.post('https://auth.myvalue.id/v1/verification/check/', requestBody3, { headers });
+
+        if (response.data.valid === true) {
+          console.log('Verifikasi berhasil:', response.data);
+          // Simpan response pertama ke file result.txt
+        saveResponseToFile(response.data);
+        } else {
+          console.log(colors.red("Kode OTP salah. Silakan coba lagi."));
+          verifyOTP();
+        }
+      } catch (error) {
+        if (error.response && error.response.status === 400 && error.response.data && error.response.data.detail === "Token yang Anda masukkan salah") {
+          console.log(colors.red("Kode OTP salah. Silakan coba lagi."));
+          verifyOTP();
+        } else {
+          console.error('Error in submitOtp:', error.message);
+          throw error;
+        }
+      }
+    });
+  }
+
+  verifyOTP();
+}
+function getCurrentDateTime() {
+  const currentDateTime = new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' });
+  return currentDateTime;
+}
+
+// Fungsi untuk menyimpan response pertama ke file result.txt
+function saveResponseToFile(data) {
+  const formattedData = `[${getCurrentDateTime()}] ${colors.green('SUCCESS')} => ${data.kgValueID}, ${data.firstName}, ${data.lastName}, ${data.email}\n`;
+
+  fs.appendFile('result.txt', formattedData, (err) => {
+    if (err) {
+      console.error('Error writing to file:', err);
+    } else {
+      console.log(`[${getCurrentDateTime()}] ${colors.green('SUCCESS')} => Data disimpan pada file result.txt`);
+    }
+  });
+}
+
+async function main() {
+  const userData = await Fake();
+  const { firstname, lastname, email } = userData;
+
+  RegistrasiLoop(email, firstname, lastname);
+}
+
+main();
